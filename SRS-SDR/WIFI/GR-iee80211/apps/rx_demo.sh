@@ -3,7 +3,7 @@
 ### Enable Wireshark Connector in wifi_rx flow graph
 
 FILE="/tmp/wifi.pcap"
-FLOWGRAPH="/home/csci2971/Desktop/SRS-SDR/WIFI/gr-ieee802-11/examples/wifi_rx.py"
+FLOWGRAPH="../examples/wifi_rx.py"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 ### create fifo
