@@ -27,11 +27,10 @@ from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
 from gnuradio import network
+from gnuradio import soapy
 from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
 import foo
 import ieee802_11
-import osmosdr
-import time
 
 
 
@@ -72,7 +71,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         ##################################################
         self.tx_gain = tx_gain = 0.75
         self.samp_rate = samp_rate = 10e6
-        self.pdu_length = pdu_length = 500
+        self.pdu_length = pdu_length = 1500
         self.out_buf_size = out_buf_size = 96000
         self.lo_offset = lo_offset = 0
         self.interval = interval = 300
@@ -83,6 +82,9 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
+        self._tx_gain_range = qtgui.Range(0, 1, 0.01, 0.75, 200)
+        self._tx_gain_win = qtgui.RangeWidget(self._tx_gain_range, self.set_tx_gain, "'tx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._tx_gain_win)
         # Create the options list
         self._samp_rate_options = [5000000.0, 10000000.0, 20000000.0]
         # Create the labels list
@@ -99,9 +101,25 @@ class wifi_tx(gr.top_block, Qt.QWidget):
             lambda i: self.set_samp_rate(self._samp_rate_options[i]))
         # Create the radio buttons
         self.top_layout.addWidget(self._samp_rate_tool_bar)
-        self._pdu_length_range = qtgui.Range(0, 1500, 1, 500, 200)
+        self._pdu_length_range = qtgui.Range(0, 1500, 1, 1500, 200)
         self._pdu_length_win = qtgui.RangeWidget(self._pdu_length_range, self.set_pdu_length, "'pdu_length'", "counter_slider", int, QtCore.Qt.Horizontal)
         self.top_layout.addWidget(self._pdu_length_win)
+        # Create the options list
+        self._lo_offset_options = [0, 6000000.0, 11000000.0]
+        # Create the labels list
+        self._lo_offset_labels = ['0', '6000000.0', '11000000.0']
+        # Create the combo box
+        self._lo_offset_tool_bar = Qt.QToolBar(self)
+        self._lo_offset_tool_bar.addWidget(Qt.QLabel("'lo_offset'" + ": "))
+        self._lo_offset_combo_box = Qt.QComboBox()
+        self._lo_offset_tool_bar.addWidget(self._lo_offset_combo_box)
+        for _label in self._lo_offset_labels: self._lo_offset_combo_box.addItem(_label)
+        self._lo_offset_callback = lambda i: Qt.QMetaObject.invokeMethod(self._lo_offset_combo_box, "setCurrentIndex", Qt.Q_ARG("int", self._lo_offset_options.index(i)))
+        self._lo_offset_callback(self.lo_offset)
+        self._lo_offset_combo_box.currentIndexChanged.connect(
+            lambda i: self.set_lo_offset(self._lo_offset_options[i]))
+        # Create the radio buttons
+        self.top_layout.addWidget(self._lo_offset_tool_bar)
         self._interval_range = qtgui.Range(10, 1000, 1, 300, 200)
         self._interval_win = qtgui.RangeWidget(self._interval_range, self.set_interval, "'interval'", "counter_slider", int, QtCore.Qt.Horizontal)
         self.top_layout.addWidget(self._interval_win)
@@ -153,41 +171,24 @@ class wifi_tx(gr.top_block, Qt.QWidget):
             frequency=freq,
             sensitivity=0.56,
         )
-        self._tx_gain_range = qtgui.Range(0, 1, 0.01, 0.75, 200)
-        self._tx_gain_win = qtgui.RangeWidget(self._tx_gain_range, self.set_tx_gain, "'tx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._tx_gain_win)
-        self.osmosdr_sink_0 = osmosdr.sink(
-            args="numchan=" + str(1) + " " + ""
-        )
-        self.osmosdr_sink_0.set_time_unknown_pps(osmosdr.time_spec_t())
-        self.osmosdr_sink_0.set_sample_rate(samp_rate)
-        self.osmosdr_sink_0.set_center_freq(freq, 0)
-        self.osmosdr_sink_0.set_freq_corr(0, 0)
-        self.osmosdr_sink_0.set_gain(14, 0)
-        self.osmosdr_sink_0.set_if_gain(30, 0)
-        self.osmosdr_sink_0.set_bb_gain(20, 0)
-        self.osmosdr_sink_0.set_antenna('', 0)
-        self.osmosdr_sink_0.set_bandwidth(0, 0)
-        self.network_socket_pdu_0 = network.socket_pdu('TCP_SERVER', '', '52001', 10000, False)
-        # Create the options list
-        self._lo_offset_options = [0, 6000000.0, 11000000.0]
-        # Create the labels list
-        self._lo_offset_labels = ['0', '6000000.0', '11000000.0']
-        # Create the combo box
-        self._lo_offset_tool_bar = Qt.QToolBar(self)
-        self._lo_offset_tool_bar.addWidget(Qt.QLabel("'lo_offset'" + ": "))
-        self._lo_offset_combo_box = Qt.QComboBox()
-        self._lo_offset_tool_bar.addWidget(self._lo_offset_combo_box)
-        for _label in self._lo_offset_labels: self._lo_offset_combo_box.addItem(_label)
-        self._lo_offset_callback = lambda i: Qt.QMetaObject.invokeMethod(self._lo_offset_combo_box, "setCurrentIndex", Qt.Q_ARG("int", self._lo_offset_options.index(i)))
-        self._lo_offset_callback(self.lo_offset)
-        self._lo_offset_combo_box.currentIndexChanged.connect(
-            lambda i: self.set_lo_offset(self._lo_offset_options[i]))
-        # Create the radio buttons
-        self.top_layout.addWidget(self._lo_offset_tool_bar)
-        # Todo: replace all these static variables with CLI args. Get Existing Cpp Script to execute these as a subprocess. 
-        self.ieee802_11_mac_0 = ieee802_11.mac([0x23, 0x23, 0x23, 0x23, 0x23, 0x23], [0x42, 0x42, 0x42, 0x42, 0x42, 0x42], [0xff, 0xff, 0xff, 0xff, 0xff, 255])
-        self.foo_packet_pad2_0 = foo.packet_pad2(False, False, 0.01, 100, 1000)
+        self.soapy_hackrf_sink_0 = None
+        dev = 'driver=hackrf'
+        stream_args = ''
+        tune_args = ['']
+        settings = ['']
+
+        self.soapy_hackrf_sink_0 = soapy.sink(dev, "fc32", 1, '',
+                                  stream_args, tune_args, settings)
+        self.soapy_hackrf_sink_0.set_sample_rate(0, samp_rate)
+        self.soapy_hackrf_sink_0.set_bandwidth(0, samp_rate)
+        self.soapy_hackrf_sink_0.set_frequency(0, (freq - lo_offset))
+        self.soapy_hackrf_sink_0.set_gain(0, 'AMP', True)
+        self.soapy_hackrf_sink_0.set_gain(0, 'VGA', min(max(tx_gain, 0.0), 47.0))
+        self.network_socket_pdu_0 = network.socket_pdu('TCP_SERVER', '', '1234', 10000, True)
+        self.network_socket_pdu_0.set_max_output_buffer(out_buf_size)
+        self.ieee802_11_mac_0 = ieee802_11.mac([0x23, 0x23, 0x23, 0x23, 0x23, 0x23], [0x24, 0x29, 0x34, 0x80, 0xf9, 0x52], [0xff, 0xff, 0xff, 0xff, 0xff, 255])
+        self.ieee802_11_mac_0.set_max_output_buffer(out_buf_size)
+        self.foo_packet_pad2_0 = foo.packet_pad2(True, True, 0.01, 100, 1000)
         self.foo_packet_pad2_0.set_min_output_buffer(out_buf_size)
         self.blocks_vector_source_x_0 = blocks.vector_source_c((0,), False, 1, [])
         self.blocks_multiply_const_vxx_0 = blocks.multiply_const_cc(0.6)
@@ -203,7 +204,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         self.msg_connect((self.network_socket_pdu_0, 'pdus'), (self.ieee802_11_mac_0, 'app in'))
         self.connect((self.blocks_multiply_const_vxx_0, 0), (self.foo_packet_pad2_0, 0))
         self.connect((self.blocks_vector_source_x_0, 0), (self.wifi_phy_hier_0, 0))
-        self.connect((self.foo_packet_pad2_0, 0), (self.osmosdr_sink_0, 0))
+        self.connect((self.foo_packet_pad2_0, 0), (self.soapy_hackrf_sink_0, 0))
         self.connect((self.wifi_phy_hier_0, 0), (self.blocks_multiply_const_vxx_0, 0))
 
 
@@ -220,6 +221,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
 
     def set_tx_gain(self, tx_gain):
         self.tx_gain = tx_gain
+        self.soapy_hackrf_sink_0.set_gain(0, 'VGA', min(max(self.tx_gain, 0.0), 47.0))
 
     def get_samp_rate(self):
         return self.samp_rate
@@ -227,7 +229,8 @@ class wifi_tx(gr.top_block, Qt.QWidget):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self._samp_rate_callback(self.samp_rate)
-        self.osmosdr_sink_0.set_sample_rate(self.samp_rate)
+        self.soapy_hackrf_sink_0.set_sample_rate(0, self.samp_rate)
+        self.soapy_hackrf_sink_0.set_bandwidth(0, self.samp_rate)
         self.wifi_phy_hier_0.set_bandwidth(self.samp_rate)
 
     def get_pdu_length(self):
@@ -249,6 +252,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
     def set_lo_offset(self, lo_offset):
         self.lo_offset = lo_offset
         self._lo_offset_callback(self.lo_offset)
+        self.soapy_hackrf_sink_0.set_frequency(0, (self.freq - self.lo_offset))
 
     def get_interval(self):
         return self.interval
@@ -263,7 +267,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
     def set_freq(self, freq):
         self.freq = freq
         self._freq_callback(self.freq)
-        self.osmosdr_sink_0.set_center_freq(self.freq, 0)
+        self.soapy_hackrf_sink_0.set_frequency(0, (self.freq - self.lo_offset))
         self.wifi_phy_hier_0.set_frequency(self.freq)
 
     def get_encoding(self):

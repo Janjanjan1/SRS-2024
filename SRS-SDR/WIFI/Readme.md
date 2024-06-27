@@ -10,3 +10,7 @@
 - increase the sample rate to 20 ie. the max and go to a wifi channel/band that has active traffic. the constellation daigrams should cluster if you have an active band and you shall see things there. 
 
 
+
+# Radio Attack:
+- here i plan on merging the GR-IEE80211 and the VPN Attack together. Replacing the send and sniff methods with something that interfaces with our SDR. 
+

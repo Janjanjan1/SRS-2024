@@ -217,6 +217,29 @@ blocks:
     coordinate: [8, 148.0]
     rotation: 0
     state: enabled
+- name: wiif_auto_tune
+  id: variable_qtgui_toggle_button_msg
+  parameters:
+    comment: ''
+    gui_hint: ''
+    initPressed: 'False'
+    label: Auto_Tune_Wifi
+    outputmsgname: value
+    pressBackgroundColor: default
+    pressFontColor: default
+    pressed: '1'
+    relBackgroundColor: default
+    relFontColor: default
+    released: '0'
+    type: int
+    value: '0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [40, 320.0]
+    rotation: 0
+    state: enabled
 - name: window_size
   id: variable
   parameters:
@@ -258,7 +281,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [496, 208.0]
+    coordinate: [520, 184.0]
     rotation: 0
     state: enabled
 - name: blocks_conjugate_cc_0
@@ -313,7 +336,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [280, 312.0]
+    coordinate: [312, 316.0]
     rotation: 0
     state: enabled
 - name: blocks_divide_xx_0
@@ -331,7 +354,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1168, 400]
+    coordinate: [1128.0, 384]
     rotation: 270
     state: enabled
 - name: blocks_file_sink_0
@@ -349,7 +372,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1344, 672.0]
+    coordinate: [1320, 672.0]
     rotation: 0
     state: enabled
 - name: blocks_moving_average_xx_0
@@ -425,7 +448,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [768, 592.0]
+    coordinate: [864, 576.0]
     rotation: 0
     state: enabled
 - name: fft_vxx_0
@@ -463,7 +486,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1136, 676.0]
+    coordinate: [1080, 676.0]
     rotation: 0
     state: enabled
 - name: ieee802_11_decode_mac_0
@@ -480,7 +503,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [864, 676]
+    coordinate: [768, 668.0]
     rotation: 0
     state: enabled
 - name: ieee802_11_frame_equalizer_0
@@ -517,7 +540,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1004.0, 792]
+    coordinate: [1092.0, 880]
     rotation: 270
     state: disabled
 - name: ieee802_11_sync_long_0
@@ -535,7 +558,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [672, 448.0]
+    coordinate: [872, 432.0]
     rotation: 0
     state: enabled
 - name: ieee802_11_sync_short_0
@@ -783,7 +806,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [8, 308.0]
+    coordinate: [152, 180.0]
     rotation: 0
     state: enabled
 
