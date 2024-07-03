@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: Wifi Tx
+# Title: Wifi Transceiver
 # GNU Radio version: 3.10.10.0
 
 from PyQt5 import Qt
@@ -25,21 +25,22 @@ from PyQt5 import Qt
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
-from gnuradio import network
+from gnuradio import gr, pdu
 from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
 import foo
 import ieee802_11
 import osmosdr
 import time
+import sip
 
 
 
-class wifi_tx(gr.top_block, Qt.QWidget):
+class wifi_transceiver(gr.top_block, Qt.QWidget):
 
     def __init__(self):
-        gr.top_block.__init__(self, "Wifi Tx", catch_exceptions=True)
+        gr.top_block.__init__(self, "Wifi Transceiver", catch_exceptions=True)
         Qt.QWidget.__init__(self)
-        self.setWindowTitle("Wifi Tx")
+        self.setWindowTitle("Wifi Transceiver")
         qtgui.util.check_set_qss()
         try:
             self.setWindowIcon(Qt.QIcon.fromTheme('gnuradio-grc'))
@@ -57,7 +58,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         self.top_grid_layout = Qt.QGridLayout()
         self.top_layout.addLayout(self.top_grid_layout)
 
-        self.settings = Qt.QSettings("GNU Radio", "wifi_tx")
+        self.settings = Qt.QSettings("GNU Radio", "wifi_transceiver")
 
         try:
             geometry = self.settings.value("geometry")
@@ -71,12 +72,11 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         ##################################################
         self.tx_gain = tx_gain = 0.75
         self.samp_rate = samp_rate = 10e6
-        self.pdu_length = pdu_length = 500
-        self.out_buf_size = out_buf_size = 96000
+        self.rx_gain = rx_gain = 0.75
         self.lo_offset = lo_offset = 0
-        self.interval = interval = 300
         self.freq = freq = 5890000000
         self.encoding = encoding = 0
+        self.chan_est = chan_est = 0
 
         ##################################################
         # Blocks
@@ -101,6 +101,9 @@ class wifi_tx(gr.top_block, Qt.QWidget):
             lambda i: self.set_samp_rate(self._samp_rate_options[i]))
         # Create the radio buttons
         self.top_layout.addWidget(self._samp_rate_tool_bar)
+        self._rx_gain_range = qtgui.Range(0, 1, 0.01, 0.75, 200)
+        self._rx_gain_win = qtgui.RangeWidget(self._rx_gain_range, self.set_rx_gain, "'rx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._rx_gain_win)
         # Create the options list
         self._lo_offset_options = [0, 6000000.0, 11000000.0]
         # Create the labels list
@@ -158,53 +161,137 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         self._encoding_button_group.buttonClicked[int].connect(
             lambda i: self.set_encoding(self._encoding_options[i]))
         self.top_layout.addWidget(self._encoding_group_box)
+        # Create the options list
+        self._chan_est_options = [0, 1, 2, 3]
+        # Create the labels list
+        self._chan_est_labels = ['LS', 'LMS', 'Linear Comb', 'STA']
+        # Create the combo box
+        # Create the radio buttons
+        self._chan_est_group_box = Qt.QGroupBox("'chan_est'" + ": ")
+        self._chan_est_box = Qt.QHBoxLayout()
+        class variable_chooser_button_group(Qt.QButtonGroup):
+            def __init__(self, parent=None):
+                Qt.QButtonGroup.__init__(self, parent)
+            @pyqtSlot(int)
+            def updateButtonChecked(self, button_id):
+                self.button(button_id).setChecked(True)
+        self._chan_est_button_group = variable_chooser_button_group()
+        self._chan_est_group_box.setLayout(self._chan_est_box)
+        for i, _label in enumerate(self._chan_est_labels):
+            radio_button = Qt.QRadioButton(_label)
+            self._chan_est_box.addWidget(radio_button)
+            self._chan_est_button_group.addButton(radio_button, i)
+        self._chan_est_callback = lambda i: Qt.QMetaObject.invokeMethod(self._chan_est_button_group, "updateButtonChecked", Qt.Q_ARG("int", self._chan_est_options.index(i)))
+        self._chan_est_callback(self.chan_est)
+        self._chan_est_button_group.buttonClicked[int].connect(
+            lambda i: self.set_chan_est(self._chan_est_options[i]))
+        self.top_layout.addWidget(self._chan_est_group_box)
         self.wifi_phy_hier_0 = wifi_phy_hier(
             bandwidth=samp_rate,
-            chan_est=ieee802_11.LS,
+            chan_est=ieee802_11.Equalizer(chan_est),
             encoding=ieee802_11.Encoding(encoding),
             frequency=freq,
             sensitivity=0.56,
         )
-        self._pdu_length_range = qtgui.Range(0, 1500, 1, 500, 200)
-        self._pdu_length_win = qtgui.RangeWidget(self._pdu_length_range, self.set_pdu_length, "'pdu_length'", "counter_slider", int, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._pdu_length_win)
-        self.osmosdr_sink_1 = osmosdr.sink(
+        self.qtgui_const_sink_x_0 = qtgui.const_sink_c(
+            (48*10), #size
+            "", #name
+            1, #number of inputs
+            None # parent
+        )
+        self.qtgui_const_sink_x_0.set_update_time(0.10)
+        self.qtgui_const_sink_x_0.set_y_axis((-2), 2)
+        self.qtgui_const_sink_x_0.set_x_axis((-2), 2)
+        self.qtgui_const_sink_x_0.set_trigger_mode(qtgui.TRIG_MODE_FREE, qtgui.TRIG_SLOPE_POS, 0.0, 0, "")
+        self.qtgui_const_sink_x_0.enable_autoscale(False)
+        self.qtgui_const_sink_x_0.enable_grid(False)
+        self.qtgui_const_sink_x_0.enable_axis_labels(True)
+
+
+        labels = ['', '', '', '', '',
+            '', '', '', '', '']
+        widths = [1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1]
+        colors = ["blue", "red", "red", "red", "red",
+            "red", "red", "red", "red", "red"]
+        styles = [0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0]
+        markers = [0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0]
+        alphas = [1.0, 1.0, 1.0, 1.0, 1.0,
+            1.0, 1.0, 1.0, 1.0, 1.0]
+
+        for i in range(1):
+            if len(labels[i]) == 0:
+                self.qtgui_const_sink_x_0.set_line_label(i, "Data {0}".format(i))
+            else:
+                self.qtgui_const_sink_x_0.set_line_label(i, labels[i])
+            self.qtgui_const_sink_x_0.set_line_width(i, widths[i])
+            self.qtgui_const_sink_x_0.set_line_color(i, colors[i])
+            self.qtgui_const_sink_x_0.set_line_style(i, styles[i])
+            self.qtgui_const_sink_x_0.set_line_marker(i, markers[i])
+            self.qtgui_const_sink_x_0.set_line_alpha(i, alphas[i])
+
+        self._qtgui_const_sink_x_0_win = sip.wrapinstance(self.qtgui_const_sink_x_0.qwidget(), Qt.QWidget)
+        self.top_layout.addWidget(self._qtgui_const_sink_x_0_win)
+        self.pdu_pdu_to_tagged_stream_0 = pdu.pdu_to_tagged_stream(gr.types.complex_t, 'packet_len')
+        self.osmosdr_source_0 = osmosdr.source(
             args="numchan=" + str(1) + " " + ""
         )
-        self.osmosdr_sink_1.set_time_now(osmosdr.time_spec_t(time.time()), osmosdr.ALL_MBOARDS)
-        self.osmosdr_sink_1.set_sample_rate(samp_rate)
-        self.osmosdr_sink_1.set_center_freq((freq- lo_offset), 0)
-        self.osmosdr_sink_1.set_freq_corr(0, 0)
-        self.osmosdr_sink_1.set_gain((tx_gain*100), 0)
-        self.osmosdr_sink_1.set_if_gain((tx_gain*100), 0)
-        self.osmosdr_sink_1.set_bb_gain((tx_gain*100), 0)
-        self.osmosdr_sink_1.set_antenna('', 0)
-        self.osmosdr_sink_1.set_bandwidth(20e6, 0)
-        self.network_socket_pdu_0 = network.socket_pdu('UDP_SERVER', '', '52001', 10000, False)
-        self._interval_range = qtgui.Range(10, 1000, 1, 300, 200)
-        self._interval_win = qtgui.RangeWidget(self._interval_range, self.set_interval, "'interval'", "counter_slider", int, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._interval_win)
-        self.ieee802_11_mac_0 = ieee802_11.mac([0x23, 0x23, 0x23, 0x23, 0x23, 0x23], [0x42, 0x42, 0x42, 0x42, 0x42, 0x42], [0xff, 0xff, 0xff, 0xff, 0xff, 255])
-        self.foo_packet_pad2_0 = foo.packet_pad2(False, False, 0.01, 100, 1000)
-        self.foo_packet_pad2_0.set_min_output_buffer(out_buf_size)
-        self.blocks_null_source_0 = blocks.null_source(gr.sizeof_gr_complex*1)
+        self.osmosdr_source_0.set_time_now(osmosdr.time_spec_t(time.time()), osmosdr.ALL_MBOARDS)
+        self.osmosdr_source_0.set_sample_rate(samp_rate)
+        self.osmosdr_source_0.set_center_freq(freq, 0)
+        self.osmosdr_source_0.set_freq_corr(0, 0)
+        self.osmosdr_source_0.set_dc_offset_mode(0, 0)
+        self.osmosdr_source_0.set_iq_balance_mode(0, 0)
+        self.osmosdr_source_0.set_gain_mode(False, 0)
+        self.osmosdr_source_0.set_gain((rx_gain*30), 0)
+        self.osmosdr_source_0.set_if_gain(20, 0)
+        self.osmosdr_source_0.set_bb_gain(20, 0)
+        self.osmosdr_source_0.set_antenna('', 0)
+        self.osmosdr_source_0.set_bandwidth(0, 0)
+        self.osmosdr_sink_0 = osmosdr.sink(
+            args="numchan=" + str(1) + " " + ""
+        )
+        self.osmosdr_sink_0.set_clock_source('internal', 0)
+        self.osmosdr_sink_0.set_time_now(osmosdr.time_spec_t(time.time()), osmosdr.ALL_MBOARDS)
+        self.osmosdr_sink_0.set_sample_rate(samp_rate)
+        self.osmosdr_sink_0.set_center_freq((freq - lo_offset), 0)
+        self.osmosdr_sink_0.set_freq_corr(0, 0)
+        self.osmosdr_sink_0.set_gain((tx_gain*30), 0)
+        self.osmosdr_sink_0.set_if_gain(20, 0)
+        self.osmosdr_sink_0.set_bb_gain(20, 0)
+        self.osmosdr_sink_0.set_antenna('', 0)
+        self.osmosdr_sink_0.set_bandwidth(0, 0)
+        self.ieee802_11_parse_mac_0 = ieee802_11.parse_mac(False, True)
+        self.ieee802_11_mac_0 = ieee802_11.mac([0x12, 0x34, 0x56, 0x78, 0x90, 0xab], [0x30, 0x14, 0x4a, 0xe6, 0x46, 0xe4], [0x42, 0x42, 0x42, 0x42, 0x42, 0x42])
+        self.foo_wireshark_connector_0 = foo.wireshark_connector(127, False)
+        self.foo_packet_pad2_0 = foo.packet_pad2(False, False, 0.001, 10000, 10000)
+        self.foo_packet_pad2_0.set_min_output_buffer(100000)
         self.blocks_multiply_const_vxx_0 = blocks.multiply_const_cc(0.6)
         self.blocks_multiply_const_vxx_0.set_min_output_buffer(100000)
+        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_char*1, '/tmp/wifi.pcap', True)
+        self.blocks_file_sink_0.set_unbuffered(True)
 
 
         ##################################################
         # Connections
         ##################################################
         self.msg_connect((self.ieee802_11_mac_0, 'phy out'), (self.wifi_phy_hier_0, 'mac_in'))
-        self.msg_connect((self.network_socket_pdu_0, 'pdus'), (self.ieee802_11_mac_0, 'app in'))
+        self.msg_connect((self.wifi_phy_hier_0, 'mac_out'), (self.foo_wireshark_connector_0, 'in'))
+        self.msg_connect((self.wifi_phy_hier_0, 'mac_out'), (self.ieee802_11_mac_0, 'phy in'))
+        self.msg_connect((self.wifi_phy_hier_0, 'mac_out'), (self.ieee802_11_parse_mac_0, 'in'))
+        self.msg_connect((self.wifi_phy_hier_0, 'carrier'), (self.pdu_pdu_to_tagged_stream_0, 'pdus'))
         self.connect((self.blocks_multiply_const_vxx_0, 0), (self.foo_packet_pad2_0, 0))
-        self.connect((self.blocks_null_source_0, 0), (self.wifi_phy_hier_0, 0))
-        self.connect((self.foo_packet_pad2_0, 0), (self.osmosdr_sink_1, 0))
+        self.connect((self.foo_packet_pad2_0, 0), (self.osmosdr_sink_0, 0))
+        self.connect((self.foo_wireshark_connector_0, 0), (self.blocks_file_sink_0, 0))
+        self.connect((self.osmosdr_source_0, 0), (self.wifi_phy_hier_0, 0))
+        self.connect((self.pdu_pdu_to_tagged_stream_0, 0), (self.qtgui_const_sink_x_0, 0))
         self.connect((self.wifi_phy_hier_0, 0), (self.blocks_multiply_const_vxx_0, 0))
 
 
     def closeEvent(self, event):
-        self.settings = Qt.QSettings("GNU Radio", "wifi_tx")
+        self.settings = Qt.QSettings("GNU Radio", "wifi_transceiver")
         self.settings.setValue("geometry", self.saveGeometry())
         self.stop()
         self.wait()
@@ -216,9 +303,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
 
     def set_tx_gain(self, tx_gain):
         self.tx_gain = tx_gain
-        self.osmosdr_sink_1.set_gain((self.tx_gain*100), 0)
-        self.osmosdr_sink_1.set_if_gain((self.tx_gain*100), 0)
-        self.osmosdr_sink_1.set_bb_gain((self.tx_gain*100), 0)
+        self.osmosdr_sink_0.set_gain((self.tx_gain*30), 0)
 
     def get_samp_rate(self):
         return self.samp_rate
@@ -226,20 +311,16 @@ class wifi_tx(gr.top_block, Qt.QWidget):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self._samp_rate_callback(self.samp_rate)
-        self.osmosdr_sink_1.set_sample_rate(self.samp_rate)
+        self.osmosdr_sink_0.set_sample_rate(self.samp_rate)
+        self.osmosdr_source_0.set_sample_rate(self.samp_rate)
         self.wifi_phy_hier_0.set_bandwidth(self.samp_rate)
 
-    def get_pdu_length(self):
-        return self.pdu_length
+    def get_rx_gain(self):
+        return self.rx_gain
 
-    def set_pdu_length(self, pdu_length):
-        self.pdu_length = pdu_length
-
-    def get_out_buf_size(self):
-        return self.out_buf_size
-
-    def set_out_buf_size(self, out_buf_size):
-        self.out_buf_size = out_buf_size
+    def set_rx_gain(self, rx_gain):
+        self.rx_gain = rx_gain
+        self.osmosdr_source_0.set_gain((self.rx_gain*30), 0)
 
     def get_lo_offset(self):
         return self.lo_offset
@@ -247,13 +328,7 @@ class wifi_tx(gr.top_block, Qt.QWidget):
     def set_lo_offset(self, lo_offset):
         self.lo_offset = lo_offset
         self._lo_offset_callback(self.lo_offset)
-        self.osmosdr_sink_1.set_center_freq((self.freq- self.lo_offset), 0)
-
-    def get_interval(self):
-        return self.interval
-
-    def set_interval(self, interval):
-        self.interval = interval
+        self.osmosdr_sink_0.set_center_freq((self.freq - self.lo_offset), 0)
 
     def get_freq(self):
         return self.freq
@@ -261,7 +336,8 @@ class wifi_tx(gr.top_block, Qt.QWidget):
     def set_freq(self, freq):
         self.freq = freq
         self._freq_callback(self.freq)
-        self.osmosdr_sink_1.set_center_freq((self.freq- self.lo_offset), 0)
+        self.osmosdr_sink_0.set_center_freq((self.freq - self.lo_offset), 0)
+        self.osmosdr_source_0.set_center_freq(self.freq, 0)
         self.wifi_phy_hier_0.set_frequency(self.freq)
 
     def get_encoding(self):
@@ -272,10 +348,18 @@ class wifi_tx(gr.top_block, Qt.QWidget):
         self._encoding_callback(self.encoding)
         self.wifi_phy_hier_0.set_encoding(ieee802_11.Encoding(self.encoding))
 
+    def get_chan_est(self):
+        return self.chan_est
+
+    def set_chan_est(self, chan_est):
+        self.chan_est = chan_est
+        self._chan_est_callback(self.chan_est)
+        self.wifi_phy_hier_0.set_chan_est(ieee802_11.Equalizer(self.chan_est))
 
 
 
-def main(top_block_cls=wifi_tx, options=None):
+
+def main(top_block_cls=wifi_transceiver, options=None):
 
     qapp = Qt.QApplication(sys.argv)
 
