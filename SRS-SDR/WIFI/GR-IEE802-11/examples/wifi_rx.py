@@ -67,6 +67,7 @@ class wifi_rx(gr.top_block, Qt.QWidget):
         # Variables
         ##################################################
         self.window_size = window_size = 48
+        self.wiif_auto_tune = wiif_auto_tune = 0
         self.sync_length = sync_length = 320
         self.samp_rate = samp_rate = 10e6
         self.lo_offset = lo_offset = 0
@@ -154,6 +155,13 @@ class wifi_rx(gr.top_block, Qt.QWidget):
         self._chan_est_button_group.buttonClicked[int].connect(
             lambda i: self.set_chan_est(self._chan_est_options[i]))
         self.top_layout.addWidget(self._chan_est_group_box)
+        self._wiif_auto_tune_choices = {'Pressed': 1, 'Released': 0}
+
+        _wiif_auto_tune_toggle_button = qtgui.ToggleButton(self.set_wiif_auto_tune, 'Auto_Tune_Wifi', self._wiif_auto_tune_choices, False, 'value')
+        _wiif_auto_tune_toggle_button.setColors("default", "default", "default", "default")
+        self.wiif_auto_tune = _wiif_auto_tune_toggle_button
+
+        self.top_layout.addWidget(_wiif_auto_tune_toggle_button)
         self.soapy_hackrf_source_0 = None
         dev = 'driver=hackrf'
         stream_args = ''
@@ -323,6 +331,12 @@ class wifi_rx(gr.top_block, Qt.QWidget):
         self.window_size = window_size
         self.blocks_moving_average_xx_0.set_length_and_scale((self.window_size  + 16), 1)
         self.blocks_moving_average_xx_1.set_length_and_scale(self.window_size, 1)
+
+    def get_wiif_auto_tune(self):
+        return self.wiif_auto_tune
+
+    def set_wiif_auto_tune(self, wiif_auto_tune):
+        self.wiif_auto_tune = wiif_auto_tune
 
     def get_sync_length(self):
         return self.sync_length
